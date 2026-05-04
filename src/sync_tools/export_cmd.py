@@ -88,7 +88,11 @@ def run_export(options: ExportOptions) -> ExportSummary:
                     # Merge new exported refs into the existing ref set
                     existing_refs = dict(repo.last_sync.refs) if repo.last_sync else {}
                     existing_refs.update(br.exported_refs)
-                    repo.last_sync = LastSync(timestamp=timestamp, refs=existing_refs)
+                    existing_lfs_oids = list(repo.last_sync.lfs_oids) if repo.last_sync else []
+                    merged_lfs_oids = sorted(set(existing_lfs_oids) | br.lfs_objects.keys())
+                    repo.last_sync = LastSync(
+                        timestamp=timestamp, refs=existing_refs, lfs_oids=merged_lfs_oids
+                    )
                 elif repo.id in set(summary.skipped):
                     # Update timestamp but keep existing refs unchanged
                     if repo.last_sync:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 import pathlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from .errors import StateFileError
@@ -15,6 +15,7 @@ _SUPPORTED_VERSION = "1"
 class LastSync:
     timestamp: str
     refs: dict[str, str]  # refname -> full SHA
+    lfs_oids: list[str] = field(default_factory=list)  # SHA-256 OIDs of synced LFS objects
 
 
 @dataclass
@@ -91,13 +92,16 @@ def _parse_repo(raw: object, path: pathlib.Path) -> RepoConfig:
             raise StateFileError(f"'last_sync.timestamp' must be a string in {path}")
         if not isinstance(refs, dict):
             raise StateFileError(f"'last_sync.refs' must be a JSON object in {path}")
-        last_sync = LastSync(timestamp=ts, refs=refs)
+        lfs_oids_raw = ls_raw.get("lfs_oids", [])
+        if not isinstance(lfs_oids_raw, list):
+            raise StateFileError(f"'last_sync.lfs_oids' must be a list in {path}")
+        last_sync = LastSync(timestamp=ts, refs=refs, lfs_oids=lfs_oids_raw)
 
     lfs_mode_raw = raw.get("lfs_mode")
     if lfs_mode_raw is not None:
-        if lfs_mode_raw not in ("skip", "allow"):
+        if lfs_mode_raw not in ("skip", "allow", "sync"):
             raise StateFileError(
-                f"'lfs_mode' must be 'skip' or 'allow' (got {lfs_mode_raw!r}) in {path}"
+                f"'lfs_mode' must be 'skip', 'allow', or 'sync' (got {lfs_mode_raw!r}) in {path}"
             )
     lfs_mode: str | None = lfs_mode_raw
 
@@ -122,8 +126,8 @@ def _repo_to_dict(repo: RepoConfig) -> dict:
     if repo.lfs_mode:
         d["lfs_mode"] = repo.lfs_mode
     if repo.last_sync:
-        d["last_sync"] = {
-            "timestamp": repo.last_sync.timestamp,
-            "refs": repo.last_sync.refs,
-        }
+        ls_dict: dict = {"timestamp": repo.last_sync.timestamp, "refs": repo.last_sync.refs}
+        if repo.last_sync.lfs_oids:
+            ls_dict["lfs_oids"] = repo.last_sync.lfs_oids
+        d["last_sync"] = ls_dict
     return d

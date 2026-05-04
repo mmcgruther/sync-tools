@@ -179,6 +179,48 @@ class TestLFSHandling:
         assert "test/lfs" in summary.skipped
         assert any("lfs" in w.lower() for _, ws in summary.warned for w in ws)
 
+    def test_lfs_sync_mode_archive_contains_objects(
+        self, tmp_path: pathlib.Path, lfs_repo: GitRepo
+    ) -> None:
+        state_path = tmp_path / "state.json"
+        state_path.write_text(json.dumps(self._lfs_state(lfs_repo, {"lfs_mode": "sync"})), encoding="utf-8")
+        out = tmp_path / "out.tar.gz"
+        summary = run_export(_make_options(state_path, out))
+        assert len(summary.failed) == 0
+        assert "test/lfs" in summary.succeeded
+        assert out.exists()
+        with tarfile.open(out, "r:gz") as tar:
+            names = tar.getnames()
+        assert any(n.startswith("lfs/") for n in names)
+
+    def test_lfs_sync_mode_incremental_no_new_objects(
+        self, tmp_path: pathlib.Path, lfs_repo: GitRepo
+    ) -> None:
+        state_path = tmp_path / "state.json"
+        state_path.write_text(json.dumps(self._lfs_state(lfs_repo, {"lfs_mode": "sync"})), encoding="utf-8")
+
+        out1 = tmp_path / "out1.tar.gz"
+        run_export(_make_options(state_path, out1))
+
+        out2 = tmp_path / "out2.tar.gz"
+        summary = run_export(_make_options(state_path, out2))
+        # No changes → skipped (no new refs and no new LFS objects)
+        assert "test/lfs" in summary.skipped
+        assert not out2.exists()
+
+    def test_lfs_sync_mode_state_records_oids(
+        self, tmp_path: pathlib.Path, lfs_repo: GitRepo
+    ) -> None:
+        from sync_tools.state import load_state
+
+        state_path = tmp_path / "state.json"
+        state_path.write_text(json.dumps(self._lfs_state(lfs_repo, {"lfs_mode": "sync"})), encoding="utf-8")
+        out = tmp_path / "out.tar.gz"
+        run_export(_make_options(state_path, out))
+        repos = load_state(state_path)
+        assert repos[0].last_sync is not None
+        assert len(repos[0].last_sync.lfs_oids) > 0
+
     def test_lfs_skip_mode_bundles_non_lfs_branch(
         self, tmp_path: pathlib.Path, mixed_lfs_repo: GitRepo
     ) -> None:

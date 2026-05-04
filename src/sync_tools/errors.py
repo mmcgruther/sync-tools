@@ -56,6 +56,10 @@ class MissingDestRepoError(SyncToolsError):
     """Destination repository path does not exist or is not a git repo."""
 
 
+class LFSObjectMissingError(SyncToolsError):
+    """One or more LFS objects referenced by the repo are not available locally."""
+
+
 @dataclass
 class RepoResult:
     """Holds per-repo outcome for parallel execution. Workers always return this, never re-raise."""

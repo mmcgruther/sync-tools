@@ -21,6 +21,8 @@ class ManifestEntry:
     exported_refs: dict[str, str]
     bundle_filename: str  # relative path inside archive, e.g. "bundles/org__repo/bundle.git"
     export_timestamp: str
+    lfs_objects: list[str] = field(default_factory=list)  # OIDs of LFS objects in archive
+    lfs_dir: str = ""  # relative prefix for LFS files, e.g. "lfs/org__repo"
 
 
 @dataclass
@@ -44,6 +46,7 @@ def create_archive(
     for result in bundle_results:
         safe_id = safe_repo_id(result.repo.id)
         bundle_rel = f"bundles/{safe_id}/bundle.git"
+        lfs_oids = list(result.lfs_objects.keys())
         entries.append(
             ManifestEntry(
                 repo_id=result.repo.id,
@@ -52,6 +55,8 @@ def create_archive(
                 exported_refs=result.exported_refs,
                 bundle_filename=bundle_rel,
                 export_timestamp=timestamp,
+                lfs_objects=lfs_oids,
+                lfs_dir=f"lfs/{safe_id}" if lfs_oids else "",
             )
         )
 
@@ -63,6 +68,8 @@ def create_archive(
         tar.add(str(manifest_path), arcname=_MANIFEST_NAME)
         for result, entry in zip(bundle_results, entries):
             tar.add(str(result.bundle_path), arcname=entry.bundle_filename)
+            for oid, lfs_path in result.lfs_objects.items():
+                tar.add(str(lfs_path), arcname=f"{entry.lfs_dir}/{oid[:2]}/{oid[2:4]}/{oid}")
 
 
 def extract_archive(
@@ -102,20 +109,24 @@ def _safe_extract(tar: tarfile.TarFile, extract_dir: pathlib.Path) -> None:
 
 
 def _manifest_to_dict(manifest: Manifest) -> dict:
+    entries_list = []
+    for e in manifest.entries:
+        entry_dict: dict = {
+            "repo_id": e.repo_id,
+            "source_url": e.source_url,
+            "dest_path": e.dest_path,
+            "exported_refs": e.exported_refs,
+            "bundle_filename": e.bundle_filename,
+            "export_timestamp": e.export_timestamp,
+        }
+        if e.lfs_objects:
+            entry_dict["lfs_objects"] = e.lfs_objects
+            entry_dict["lfs_dir"] = e.lfs_dir
+        entries_list.append(entry_dict)
     return {
         "version": manifest.version,
         "export_timestamp": manifest.export_timestamp,
-        "entries": [
-            {
-                "repo_id": e.repo_id,
-                "source_url": e.source_url,
-                "dest_path": e.dest_path,
-                "exported_refs": e.exported_refs,
-                "bundle_filename": e.bundle_filename,
-                "export_timestamp": e.export_timestamp,
-            }
-            for e in manifest.entries
-        ],
+        "entries": entries_list,
     }
 
 
@@ -146,6 +157,8 @@ def _parse_manifest(raw: object) -> Manifest:
                     exported_refs=e["exported_refs"],
                     bundle_filename=e["bundle_filename"],
                     export_timestamp=e["export_timestamp"],
+                    lfs_objects=e.get("lfs_objects", []),
+                    lfs_dir=e.get("lfs_dir", ""),
                 )
             )
         except KeyError as exc:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import shutil
 import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -99,6 +100,16 @@ def _import_one_repo(
 
         if not bundle_path.exists():
             raise SyncToolsError(f"Bundle file missing from archive: {entry.bundle_filename}")
+
+        # Copy LFS objects to destination before bundle fetch
+        if entry.lfs_objects and entry.lfs_dir and not dry_run:
+            dest_lfs = dest / "lfs" / "objects"
+            for oid in entry.lfs_objects:
+                src_obj = extract_dir / entry.lfs_dir / oid[:2] / oid[2:4] / oid
+                if src_obj.exists():
+                    dst_obj = dest_lfs / oid[:2] / oid[2:4] / oid
+                    dst_obj.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(src_obj, dst_obj)
 
         verify_bundle(dest, bundle_path)
 

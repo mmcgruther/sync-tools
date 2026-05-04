@@ -7,6 +7,7 @@ from .errors import (
     CaseConflictError,
     HierarchyConflictError,
     LFSDetectedError,
+    LFSObjectMissingError,
     RebaseDetectedError,
     TagMovedError,
 )
@@ -16,6 +17,8 @@ from .git_ops import (
     find_hierarchy_conflicts,
     has_lfs_objects,
     is_ancestor,
+    lfs_object_path,
+    lfs_oids_for_refs,
     refs_with_lfs,
 )
 from .state import RepoConfig
@@ -37,6 +40,7 @@ class BundleResult:
     bundle_path: pathlib.Path
     exported_refs: dict[str, str]  # refname -> SHA at time of export
     warnings: list[str] = field(default_factory=list)
+    lfs_objects: dict[str, pathlib.Path] = field(default_factory=dict)  # oid -> local path
 
 
 def plan_bundle(
@@ -68,6 +72,10 @@ def plan_bundle(
         elif repo.lfs_mode == "allow":
             warnings.append(
                 "Git LFS detected: bundle contains only pointer files, not actual LFS object data."
+            )
+        elif repo.lfs_mode == "sync":
+            warnings.append(
+                "Git LFS detected: LFS objects will be included in the sync archive."
             )
         else:
             raise LFSDetectedError(
@@ -210,9 +218,31 @@ def execute_bundle(
     # Record the SHA of each exported ref at the time of export
     exported_refs = {ref: current_refs[ref] for ref in plan.refs_to_bundle}
 
+    # Collect LFS object files for "sync" mode
+    lfs_objects: dict[str, pathlib.Path] = {}
+    if plan.repo.lfs_mode == "sync" and plan.refs_to_bundle:
+        already_synced = set(plan.repo.last_sync.lfs_oids) if plan.repo.last_sync else set()
+        all_oids = lfs_oids_for_refs(source_path, plan.refs_to_bundle)
+        new_oids = all_oids - already_synced
+        missing: list[str] = []
+        for oid in new_oids:
+            obj_path = lfs_object_path(source_path, oid)
+            if obj_path is not None:
+                lfs_objects[oid] = obj_path
+            else:
+                missing.append(oid)
+        if missing:
+            raise LFSObjectMissingError(
+                f"Repo {plan.repo.id}: {len(missing)} LFS object(s) referenced but not "
+                "present locally. Run 'git lfs fetch --all' in the source repo.\n"
+                + "\n".join(f"  {oid}" for oid in missing[:10])
+                + (f"\n  ... and {len(missing) - 10} more" if len(missing) > 10 else "")
+            )
+
     return BundleResult(
         repo=plan.repo,
         bundle_path=bundle_path,
         exported_refs=exported_refs,
         warnings=plan.warnings,
+        lfs_objects=lfs_objects,
     )

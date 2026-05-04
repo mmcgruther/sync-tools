@@ -261,6 +261,81 @@ class TestMissingPrerequisite:
         assert "prerequisite" in error_msg or "missing" in error_msg or "verify" in error_msg
 
 
+class TestLFSSyncImport:
+    def _lfs_sync_state(self, lfs_repo: GitRepo, dest_path: pathlib.Path) -> dict:
+        return {
+            "version": "1",
+            "repos": [
+                {
+                    "id": "test/lfs",
+                    "source_url": str(lfs_repo.path),
+                    "source_local_path": str(lfs_repo.path),
+                    "dest_path": str(dest_path),
+                    "lfs_mode": "sync",
+                }
+            ],
+        }
+
+    def test_lfs_objects_copied_to_dest(
+        self, tmp_path: pathlib.Path, lfs_repo: GitRepo
+    ) -> None:
+        fresh_dest = tmp_path / "fresh-dest.git"
+        _git(["init", "--bare", str(fresh_dest)], tmp_path)
+
+        state_path = tmp_path / "state.json"
+        state_path.write_text(
+            __import__("json").dumps(self._lfs_sync_state(lfs_repo, fresh_dest)),
+            encoding="utf-8",
+        )
+
+        archive = tmp_path / "out.tar.gz"
+        _export(state_path, archive)
+
+        # Import into fresh dest
+        state_path2 = tmp_path / "state2.json"
+        import json as _json
+
+        state2 = _json.loads(state_path.read_text())
+        state2["repos"][0]["dest_path"] = str(fresh_dest)
+        state_path2.write_text(_json.dumps(state2), encoding="utf-8")
+
+        _import(archive, state_path=state_path2)
+
+        # Verify LFS objects exist in the destination
+        dest_lfs = fresh_dest / "lfs" / "objects"
+        assert dest_lfs.exists()
+        lfs_files = list(dest_lfs.rglob("*"))
+        lfs_files = [f for f in lfs_files if f.is_file()]
+        assert len(lfs_files) > 0
+
+    def test_dry_run_skips_lfs_copy(
+        self, tmp_path: pathlib.Path, lfs_repo: GitRepo
+    ) -> None:
+        fresh_dest = tmp_path / "fresh-dest.git"
+        _git(["init", "--bare", str(fresh_dest)], tmp_path)
+
+        state_path = tmp_path / "state.json"
+        state_path.write_text(
+            __import__("json").dumps(self._lfs_sync_state(lfs_repo, fresh_dest)),
+            encoding="utf-8",
+        )
+
+        archive = tmp_path / "out.tar.gz"
+        _export(state_path, archive)
+
+        import json as _json
+
+        state2 = _json.loads(state_path.read_text())
+        state2["repos"][0]["dest_path"] = str(fresh_dest)
+        state_path2 = tmp_path / "state2.json"
+        state_path2.write_text(_json.dumps(state2), encoding="utf-8")
+
+        _import(archive, state_path=state_path2, dry_run=True)
+
+        dest_lfs = fresh_dest / "lfs" / "objects"
+        assert not dest_lfs.exists()
+
+
 class TestDryRun:
     def test_dry_run_does_not_modify_dest(
         self,

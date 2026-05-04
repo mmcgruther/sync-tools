@@ -131,6 +131,39 @@ def refs_with_lfs(repo_path: pathlib.Path, refs: list[str]) -> set[str]:
     return result
 
 
+def lfs_oids_for_refs(repo_path: pathlib.Path, refs: list[str]) -> set[str]:
+    """Return all LFS OIDs (64-char SHA-256 hex) referenced by the given refs.
+    Returns empty set if git-lfs not installed. Never raises."""
+    if shutil.which("git-lfs") is None:
+        return set()
+    oids: set[str] = set()
+    for ref in refs:
+        try:
+            proc = subprocess.run(
+                ["git", "lfs", "ls-files", "--long", ref],
+                cwd=str(repo_path),
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            for line in proc.stdout.splitlines():
+                parts = line.strip().split(" ", 1)
+                if parts and len(parts[0]) == 64:
+                    oids.add(parts[0])
+        except Exception:
+            pass
+    return oids
+
+
+def lfs_object_path(repo_path: pathlib.Path, oid: str) -> pathlib.Path | None:
+    """Return the local path to an LFS object file, or None if not present on disk."""
+    for prefix in (repo_path / "lfs" / "objects", repo_path / ".git" / "lfs" / "objects"):
+        p = prefix / oid[:2] / oid[2:4] / oid
+        if p.exists():
+            return p
+    return None
+
+
 def find_case_conflicts(refs: dict[str, str]) -> list[tuple[str, str]]:
     """
     Pure function. Return pairs of refnames that differ only by case.

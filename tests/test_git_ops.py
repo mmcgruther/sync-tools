@@ -12,6 +12,8 @@ from sync_tools.git_ops import (
     has_lfs_objects,
     is_ancestor,
     is_git_repo,
+    lfs_object_path,
+    lfs_oids_for_refs,
     list_refs,
     refs_with_lfs,
     resolve_ref,
@@ -185,6 +187,57 @@ class TestIsGitRepo:
 
     def test_false_for_missing(self, tmp_path: pathlib.Path) -> None:
         assert is_git_repo(tmp_path / "nonexistent") is False
+
+
+class TestLfsOidsForRefs:
+    def test_no_lfs_in_normal_repo(self, git_repo: GitRepo) -> None:
+        refs = list(list_refs(git_repo.path).keys())
+        assert lfs_oids_for_refs(git_repo.path, refs) == set()
+
+    def test_returns_oids_for_lfs_repo(self, lfs_repo: GitRepo) -> None:
+        refs = list(list_refs(lfs_repo.path).keys())
+        result = lfs_oids_for_refs(lfs_repo.path, refs)
+        assert len(result) > 0
+        for oid in result:
+            assert len(oid) == 64
+            assert all(c in "0123456789abcdef" for c in oid)
+
+    def test_partial_lfs_only_lfs_ref_contributes(self, mixed_lfs_repo: GitRepo) -> None:
+        refs = list(list_refs(mixed_lfs_repo.path).keys())
+        all_oids = lfs_oids_for_refs(mixed_lfs_repo.path, refs)
+        no_lfs_oids = lfs_oids_for_refs(mixed_lfs_repo.path, ["refs/heads/no-lfs"])
+        main_oids = lfs_oids_for_refs(mixed_lfs_repo.path, ["refs/heads/main"])
+        assert len(no_lfs_oids) == 0
+        assert len(main_oids) > 0
+        assert all_oids == main_oids
+
+
+class TestLfsObjectPath:
+    def test_returns_none_when_missing(self, tmp_path: pathlib.Path) -> None:
+        repo = tmp_path / "fake-repo"
+        repo.mkdir()
+        oid = "a" * 64
+        assert lfs_object_path(repo, oid) is None
+
+    def test_finds_bare_repo_object(self, tmp_path: pathlib.Path) -> None:
+        repo = tmp_path / "fake-bare.git"
+        oid = "abcdef1234" + "0" * 54
+        obj_dir = repo / "lfs" / "objects" / oid[:2] / oid[2:4]
+        obj_dir.mkdir(parents=True)
+        obj_file = obj_dir / oid
+        obj_file.write_bytes(b"fake lfs data")
+        result = lfs_object_path(repo, oid)
+        assert result == obj_file
+
+    def test_finds_nonbare_repo_object(self, tmp_path: pathlib.Path) -> None:
+        repo = tmp_path / "fake-nonbare"
+        oid = "deadbeef12" + "0" * 54
+        obj_dir = repo / ".git" / "lfs" / "objects" / oid[:2] / oid[2:4]
+        obj_dir.mkdir(parents=True)
+        obj_file = obj_dir / oid
+        obj_file.write_bytes(b"fake lfs data")
+        result = lfs_object_path(repo, oid)
+        assert result == obj_file
 
 
 class TestCloneToTemp:

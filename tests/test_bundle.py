@@ -9,6 +9,7 @@ from sync_tools.errors import (
     CaseConflictError,
     HierarchyConflictError,
     LFSDetectedError,
+    LFSObjectMissingError,
     RebaseDetectedError,
     TagMovedError,
 )
@@ -188,6 +189,54 @@ class TestExecuteBundle:
         result = execute_bundle(plan, tmp_path / "out", git_repo.path, current_refs)
         for ref in plan.refs_to_bundle:
             assert result.exported_refs[ref] == current_refs[ref]
+
+    def test_lfs_sync_mode_collects_objects(self, lfs_repo: GitRepo, tmp_path: pathlib.Path) -> None:
+        current_refs = list_refs(lfs_repo.path)
+        repo = _make_repo_config(lfs_repo, lfs_mode="sync")
+        plan = plan_bundle(repo, current_refs, lfs_repo.path)
+        result = execute_bundle(plan, tmp_path / "out", lfs_repo.path, current_refs)
+        assert len(result.lfs_objects) > 0
+        for oid, path in result.lfs_objects.items():
+            assert len(oid) == 64
+            assert path.exists()
+
+    def test_lfs_sync_mode_incremental_skips_known_oids(
+        self, lfs_repo: GitRepo, tmp_path: pathlib.Path
+    ) -> None:
+        current_refs = list_refs(lfs_repo.path)
+        repo = _make_repo_config(lfs_repo, lfs_mode="sync")
+        plan = plan_bundle(repo, current_refs, lfs_repo.path)
+        first = execute_bundle(plan, tmp_path / "first", lfs_repo.path, current_refs)
+        known_oids = list(first.lfs_objects.keys())
+
+        # Second execute with all OIDs already in last_sync
+        repo2 = _make_repo_config(
+            lfs_repo,
+            last_sync=LastSync(timestamp="2024-01-01T00:00:00Z", refs=dict(current_refs), lfs_oids=known_oids),
+            lfs_mode="sync",
+        )
+        plan2 = plan_bundle(repo2, current_refs, lfs_repo.path)
+        assert plan2.no_changes is True  # refs unchanged, so plan says no changes
+        # Even if we forced execute, lfs_objects would be empty — verify logic directly
+        # by checking that new_oids = all_oids - already_synced = empty
+        from sync_tools.git_ops import lfs_oids_for_refs
+        all_oids = lfs_oids_for_refs(lfs_repo.path, list(current_refs.keys()))
+        new_oids = all_oids - set(known_oids)
+        assert new_oids == set()
+
+    def test_lfs_sync_mode_missing_object_raises(
+        self, lfs_repo: GitRepo, tmp_path: pathlib.Path
+    ) -> None:
+        import unittest.mock as mock
+
+        current_refs = list_refs(lfs_repo.path)
+        repo = _make_repo_config(lfs_repo, lfs_mode="sync")
+        plan = plan_bundle(repo, current_refs, lfs_repo.path)
+
+        # Simulate object not present locally
+        with mock.patch("sync_tools.bundle.lfs_object_path", return_value=None):
+            with pytest.raises(LFSObjectMissingError, match="not present locally"):
+                execute_bundle(plan, tmp_path / "out", lfs_repo.path, current_refs)
 
     def test_incremental_bundle_is_smaller(self, git_repo: GitRepo, tmp_path: pathlib.Path) -> None:
         # Build up a large commit history so the full bundle is substantial

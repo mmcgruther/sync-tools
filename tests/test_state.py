@@ -192,6 +192,82 @@ class TestLfsMode:
         assert "lfs_mode" not in raw["repos"][0]
 
 
+class TestLastSyncLfsOids:
+    def test_lfs_oids_absent_from_json_when_empty(self, tmp_path: pathlib.Path) -> None:
+        p = tmp_path / "state.json"
+        repos = [
+            RepoConfig(
+                id="x/y",
+                source_url="u",
+                dest_path="d",
+                last_sync=LastSync(timestamp="2024-01-01T00:00:00Z", refs={}),
+            )
+        ]
+        save_state(p, repos)
+        raw = json.loads(p.read_text(encoding="utf-8"))
+        assert "lfs_oids" not in raw["repos"][0]["last_sync"]
+
+    def test_lfs_oids_roundtrip(self, tmp_path: pathlib.Path) -> None:
+        p = tmp_path / "state.json"
+        oids = ["a" * 64, "b" * 64]
+        repos = [
+            RepoConfig(
+                id="x/y",
+                source_url="u",
+                dest_path="d",
+                last_sync=LastSync(timestamp="2024-01-01T00:00:00Z", refs={}, lfs_oids=oids),
+            )
+        ]
+        save_state(p, repos)
+        loaded = load_state(p)
+        assert loaded[0].last_sync is not None
+        assert sorted(loaded[0].last_sync.lfs_oids) == sorted(oids)
+
+    def test_lfs_mode_sync_roundtrip(self, tmp_path: pathlib.Path) -> None:
+        p = tmp_path / "state.json"
+        _write_state(
+            p,
+            _minimal_state(
+                [
+                    {
+                        "id": "org/repo",
+                        "source_url": "https://git.example.com/org/repo.git",
+                        "dest_path": "/mnt/dest/repo.git",
+                        "lfs_mode": "sync",
+                    }
+                ]
+            ),
+        )
+        repos = load_state(p)
+        assert repos[0].lfs_mode == "sync"
+        save_state(p, repos)
+        reloaded = load_state(p)
+        assert reloaded[0].lfs_mode == "sync"
+
+    def test_lfs_oids_invalid_raises(self, tmp_path: pathlib.Path) -> None:
+        p = tmp_path / "state.json"
+        _write_state(
+            p,
+            {
+                "version": "1",
+                "repos": [
+                    {
+                        "id": "org/repo",
+                        "source_url": "u",
+                        "dest_path": "d",
+                        "last_sync": {
+                            "timestamp": "2024-01-01T00:00:00Z",
+                            "refs": {},
+                            "lfs_oids": "not-a-list",
+                        },
+                    }
+                ],
+            },
+        )
+        with pytest.raises(StateFileError, match="lfs_oids"):
+            load_state(p)
+
+
 class TestNowUtcIso:
     def test_format(self) -> None:
         ts = now_utc_iso()
