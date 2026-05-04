@@ -104,6 +104,7 @@ A `.tar.gz` containing:
 | Tag moved to non-descendant commit | Always fail. Tags are treated as immutable. |
 | Branch force-pushed / rebased | Fail by default. Override with `--allow-rebase` (creates full bundle for that branch). |
 | Refs differing only by case | Always fail. Case conflicts break Windows case-insensitive checkout. |
+| Ref name is path-component prefix of another (e.g. `bugfix` and `bugfix/a`) | Always fail. Cannot coexist on a standard filesystem. |
 | Missing prerequisite objects on import | Fail with `MissingPrerequisiteError`; clear message. |
 | Missing destination repo on import | Fail with `MissingDestRepoError`. Override with `--auto-init`. |
 | No changes since last sync | Silently skipped; state timestamp still updated. |

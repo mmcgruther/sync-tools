@@ -7,6 +7,7 @@ import pytest
 from sync_tools.bundle import execute_bundle, plan_bundle
 from sync_tools.errors import (
     CaseConflictError,
+    HierarchyConflictError,
     LFSDetectedError,
     RebaseDetectedError,
     TagMovedError,
@@ -136,6 +137,15 @@ class TestPlanBundle:
         }
         repo = _make_repo_config(git_repo)
         with pytest.raises(CaseConflictError):
+            plan_bundle(repo, current_refs, git_repo.path)
+
+    def test_hierarchy_conflict_raises(self, git_repo: GitRepo) -> None:
+        current_refs = {
+            "refs/heads/bugfix": "a" * 40,
+            "refs/heads/bugfix/a": "b" * 40,
+        }
+        repo = _make_repo_config(git_repo)
+        with pytest.raises(HierarchyConflictError):
             plan_bundle(repo, current_refs, git_repo.path)
 
 

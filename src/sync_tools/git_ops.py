@@ -128,6 +128,19 @@ def find_case_conflicts(refs: dict[str, str]) -> list[tuple[str, str]]:
     return conflicts
 
 
+def find_hierarchy_conflicts(refs: dict[str, str]) -> list[tuple[str, str]]:
+    """Pure function. Return pairs (ref_a, ref_b) where ref_a is a path-component prefix of ref_b.
+    e.g. ('refs/heads/bugfix', 'refs/heads/bugfix/a') — bugfix cannot be both a file and a dir."""
+    names = sorted(refs.keys())
+    conflicts: list[tuple[str, str]] = []
+    for i, ref_a in enumerate(names):
+        prefix = ref_a + "/"
+        for ref_b in names[i + 1 :]:
+            if ref_b.startswith(prefix):
+                conflicts.append((ref_a, ref_b))
+    return conflicts
+
+
 def create_bundle(
     repo_path: pathlib.Path,
     bundle_path: pathlib.Path,

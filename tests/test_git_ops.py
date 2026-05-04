@@ -8,6 +8,7 @@ from sync_tools.errors import GitCommandError
 from sync_tools.git_ops import (
     clone_to_temp,
     find_case_conflicts,
+    find_hierarchy_conflicts,
     has_lfs_objects,
     is_ancestor,
     is_git_repo,
@@ -114,6 +115,44 @@ class TestFindCaseConflicts:
 
     def test_empty(self) -> None:
         assert find_case_conflicts({}) == []
+
+
+class TestFindHierarchyConflicts:
+    def test_no_conflicts(self) -> None:
+        refs = {
+            "refs/heads/main": "a" * 40,
+            "refs/heads/bugfix": "b" * 40,
+            "refs/heads/feature/new": "c" * 40,
+        }
+        assert find_hierarchy_conflicts(refs) == []
+
+    def test_detects_conflict(self) -> None:
+        refs = {
+            "refs/heads/bugfix": "a" * 40,
+            "refs/heads/bugfix/a": "b" * 40,
+        }
+        conflicts = find_hierarchy_conflicts(refs)
+        assert len(conflicts) == 1
+        assert conflicts[0] == ("refs/heads/bugfix", "refs/heads/bugfix/a")
+
+    def test_multiple_children(self) -> None:
+        refs = {
+            "refs/heads/bugfix": "a" * 40,
+            "refs/heads/bugfix/a": "b" * 40,
+            "refs/heads/bugfix/b": "c" * 40,
+        }
+        conflicts = find_hierarchy_conflicts(refs)
+        assert len(conflicts) == 2
+
+    def test_no_false_positive_on_common_prefix(self) -> None:
+        refs = {
+            "refs/heads/bugfix": "a" * 40,
+            "refs/heads/bugfix-long": "b" * 40,
+        }
+        assert find_hierarchy_conflicts(refs) == []
+
+    def test_empty(self) -> None:
+        assert find_hierarchy_conflicts({}) == []
 
 
 class TestIsGitRepo:

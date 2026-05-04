@@ -43,6 +43,11 @@ class CaseConflictError(SyncToolsError):
     """Two or more refs differ only by case (problematic on case-insensitive filesystems)."""
 
 
+class HierarchyConflictError(SyncToolsError):
+    """A ref name is a path-component prefix of another ref (e.g. 'bugfix' and 'bugfix/a').
+    Cannot coexist on a filesystem because one would need to be both a file and a directory."""
+
+
 class MissingPrerequisiteError(SyncToolsError):
     """git bundle verify failed: destination lacks prerequisite objects."""
 

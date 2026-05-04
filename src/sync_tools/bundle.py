@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 
 from .errors import (
     CaseConflictError,
+    HierarchyConflictError,
     LFSDetectedError,
     RebaseDetectedError,
     TagMovedError,
@@ -12,6 +13,7 @@ from .errors import (
 from .git_ops import (
     create_bundle,
     find_case_conflicts,
+    find_hierarchy_conflicts,
     has_lfs_objects,
     is_ancestor,
 )
@@ -72,6 +74,15 @@ def plan_bundle(
         raise CaseConflictError(
             f"Repo {repo.id} has refs that differ only by case {pairs}. "
             "This causes failures on case-insensitive filesystems (e.g. Windows)."
+        )
+
+    # Hierarchy conflict check
+    hierarchy_conflicts = find_hierarchy_conflicts(current_refs)
+    if hierarchy_conflicts:
+        pairs = ", ".join(f"({a!r} vs {b!r})" for a, b in hierarchy_conflicts)
+        raise HierarchyConflictError(
+            f"Repo {repo.id} has refs where one name is a path prefix of another: {pairs}. "
+            "This cannot be checked out on a standard filesystem."
         )
 
     # First-time sync
