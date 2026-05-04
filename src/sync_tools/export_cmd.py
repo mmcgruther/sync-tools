@@ -18,7 +18,6 @@ class ExportOptions:
     state_path: pathlib.Path
     output_path: pathlib.Path
     workers: int
-    allow_lfs: bool
     allow_rebase: bool
     dry_run: bool
     verbose: bool = False
@@ -50,7 +49,6 @@ def run_export(options: ExportOptions) -> ExportSummary:
                     _export_one_repo,
                     repo,
                     tmp_dir,
-                    options.allow_lfs,
                     options.allow_rebase,
                 ): repo
                 for repo in repos
@@ -107,7 +105,6 @@ def run_export(options: ExportOptions) -> ExportSummary:
 def _export_one_repo(
     repo: RepoConfig,
     tmp_dir: pathlib.Path,
-    allow_lfs: bool,
     allow_rebase: bool,
 ) -> RepoResult:
     """Worker function. Always returns RepoResult, never raises."""
@@ -118,7 +115,6 @@ def _export_one_repo(
             repo=repo,
             current_refs=current_refs,
             source_path=source_path,
-            allow_lfs=allow_lfs,
             allow_rebase=allow_rebase,
         )
 

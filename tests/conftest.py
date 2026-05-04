@@ -151,6 +151,36 @@ def lfs_repo(tmp_path: pathlib.Path) -> GitRepo:
 
 
 @pytest.fixture()
+def mixed_lfs_repo(tmp_path: pathlib.Path) -> GitRepo:
+    """Repo with LFS on 'main' and a clean 'no-lfs' branch without LFS objects."""
+    if shutil.which("git-lfs") is None:
+        pytest.skip("git-lfs not installed")
+
+    src = tmp_path / "mixed-lfs-source"
+    src.mkdir()
+    _git(["init", "-b", "main"], src)
+    git_config(src)
+    _git(["lfs", "install", "--local"], src)
+    _git(["lfs", "track", "*.bin"], src)
+    _git(["add", ".gitattributes"], src)
+    _git(["commit", "-m", "init lfs tracking"], src)
+
+    # Branch no-lfs before any LFS files are added so its tree has no LFS objects
+    _git(["checkout", "-b", "no-lfs"], src)
+    make_commit(src, "normal file", "readme.txt", "hello")
+    _git(["checkout", "main"], src)
+
+    bin_file = src / "data.bin"
+    bin_file.write_bytes(b"\x00" * 1024)
+    _git(["add", "data.bin"], src)
+    _git(["commit", "-m", "add lfs file"], src)
+
+    bare = tmp_path / "mixed-lfs-dest.git"
+    _git(["clone", "--bare", str(src), str(bare)], tmp_path)
+    return GitRepo(path=src, bare_path=bare)
+
+
+@pytest.fixture()
 def state_file(tmp_path: pathlib.Path, git_repo: GitRepo) -> pathlib.Path:
     """Write a minimal state JSON for git_repo with no last_sync (first-time export)."""
     import json

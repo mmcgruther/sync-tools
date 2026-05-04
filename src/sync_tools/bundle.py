@@ -16,6 +16,7 @@ from .git_ops import (
     find_hierarchy_conflicts,
     has_lfs_objects,
     is_ancestor,
+    refs_with_lfs,
 )
 from .state import RepoConfig
 
@@ -42,30 +43,39 @@ def plan_bundle(
     repo: RepoConfig,
     current_refs: dict[str, str],
     source_path: pathlib.Path,
-    allow_lfs: bool = False,
     allow_rebase: bool = False,
 ) -> BundlePlan:
     """
     Examine current_refs against repo.last_sync.refs and produce a BundlePlan.
 
     Raises:
-        LFSDetectedError  — if LFS objects found and allow_lfs is False
+        LFSDetectedError  — if LFS objects found and repo.lfs_mode is None
         CaseConflictError — if any refs differ only by case
         TagMovedError     — if a tag moved to a non-ancestor commit
         RebaseDetectedError — if a branch was force-pushed and allow_rebase is False
     """
     warnings: list[str] = []
 
-    # LFS check
+    # LFS handling
+    lfs_refs: set[str] = set()
     if has_lfs_objects(source_path):
-        if not allow_lfs:
+        if repo.lfs_mode == "skip":
+            lfs_refs = refs_with_lfs(source_path, list(current_refs.keys()))
+            for ref in sorted(lfs_refs):
+                warnings.append(
+                    f"Skipping {ref}: contains Git LFS objects (bundle would be incomplete)."
+                )
+        elif repo.lfs_mode == "allow":
+            warnings.append(
+                "Git LFS detected: bundle contains only pointer files, not actual LFS object data."
+            )
+        else:
             raise LFSDetectedError(
                 f"Repo {repo.id} uses Git LFS. Bundles contain only pointer files, not "
-                "LFS object data. Use --allow-lfs to proceed anyway."
+                "LFS object data. Set lfs_mode to 'skip' or 'allow' in the state file."
             )
-        warnings.append(
-            "Git LFS detected: bundle contains only pointer files, not actual LFS object data."
-        )
+
+    filtered_refs = {k: v for k, v in current_refs.items() if k not in lfs_refs}
 
     # Case conflict check
     conflicts = find_case_conflicts(current_refs)
@@ -87,19 +97,29 @@ def plan_bundle(
 
     # First-time sync
     if repo.last_sync is None:
+        refs_list = list(filtered_refs.keys())
+        if not refs_list:
+            return BundlePlan(
+                repo=repo,
+                refs_to_bundle=[],
+                since_shas={},
+                warnings=warnings,
+                is_full_bundle=False,
+                no_changes=True,
+            )
         return BundlePlan(
             repo=repo,
-            refs_to_bundle=list(current_refs.keys()),
+            refs_to_bundle=refs_list,
             since_shas={},
             warnings=warnings,
-            is_full_bundle=True,
+            is_full_bundle=not lfs_refs,  # use --all only when no refs were filtered
         )
 
     old_refs = repo.last_sync.refs
     refs_to_bundle: list[str] = []
     since_shas: dict[str, str] = {}
 
-    for ref, new_sha in current_refs.items():
+    for ref, new_sha in filtered_refs.items():
         old_sha = old_refs.get(ref)
 
         if old_sha is None:

@@ -109,6 +109,28 @@ def has_lfs_objects(repo_path: pathlib.Path) -> bool:
         return False
 
 
+def refs_with_lfs(repo_path: pathlib.Path, refs: list[str]) -> set[str]:
+    """Return the subset of refs whose tree contains LFS-tracked files.
+    Returns empty set if git-lfs is not installed. Never raises."""
+    if shutil.which("git-lfs") is None:
+        return set()
+    result: set[str] = set()
+    for ref in refs:
+        try:
+            proc = subprocess.run(
+                ["git", "lfs", "ls-files", ref],
+                cwd=str(repo_path),
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            if proc.stdout.strip():
+                result.add(ref)
+        except Exception:
+            pass
+    return result
+
+
 def find_case_conflicts(refs: dict[str, str]) -> list[tuple[str, str]]:
     """
     Pure function. Return pairs of refnames that differ only by case.

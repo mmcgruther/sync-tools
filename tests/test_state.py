@@ -120,6 +120,78 @@ class TestSaveState:
         assert loaded[0].id == "c/d"
 
 
+class TestLfsMode:
+    def test_lfs_mode_absent_by_default(self, tmp_path: pathlib.Path) -> None:
+        p = tmp_path / "state.json"
+        _write_state(p, _minimal_state())
+        repos = load_state(p)
+        assert repos[0].lfs_mode is None
+
+    def test_lfs_mode_skip_roundtrip(self, tmp_path: pathlib.Path) -> None:
+        p = tmp_path / "state.json"
+        _write_state(
+            p,
+            _minimal_state(
+                [
+                    {
+                        "id": "org/repo",
+                        "source_url": "https://git.example.com/org/repo.git",
+                        "dest_path": "/mnt/dest/repo.git",
+                        "lfs_mode": "skip",
+                    }
+                ]
+            ),
+        )
+        repos = load_state(p)
+        assert repos[0].lfs_mode == "skip"
+        save_state(p, repos)
+        reloaded = load_state(p)
+        assert reloaded[0].lfs_mode == "skip"
+
+    def test_lfs_mode_allow_roundtrip(self, tmp_path: pathlib.Path) -> None:
+        p = tmp_path / "state.json"
+        _write_state(
+            p,
+            _minimal_state(
+                [
+                    {
+                        "id": "org/repo",
+                        "source_url": "https://git.example.com/org/repo.git",
+                        "dest_path": "/mnt/dest/repo.git",
+                        "lfs_mode": "allow",
+                    }
+                ]
+            ),
+        )
+        repos = load_state(p)
+        assert repos[0].lfs_mode == "allow"
+
+    def test_lfs_mode_invalid_value_raises(self, tmp_path: pathlib.Path) -> None:
+        p = tmp_path / "state.json"
+        _write_state(
+            p,
+            _minimal_state(
+                [
+                    {
+                        "id": "org/repo",
+                        "source_url": "https://git.example.com/org/repo.git",
+                        "dest_path": "/mnt/dest/repo.git",
+                        "lfs_mode": "foo",
+                    }
+                ]
+            ),
+        )
+        with pytest.raises(StateFileError, match="lfs_mode"):
+            load_state(p)
+
+    def test_lfs_mode_none_not_serialized(self, tmp_path: pathlib.Path) -> None:
+        p = tmp_path / "state.json"
+        repos = [RepoConfig(id="x/y", source_url="u", dest_path="d", lfs_mode=None)]
+        save_state(p, repos)
+        raw = json.loads(p.read_text(encoding="utf-8"))
+        assert "lfs_mode" not in raw["repos"][0]
+
+
 class TestNowUtcIso:
     def test_format(self) -> None:
         ts = now_utc_iso()

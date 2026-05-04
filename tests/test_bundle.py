@@ -18,13 +18,18 @@ from sync_tools.state import LastSync, RepoConfig
 from .conftest import GitRepo, _git, force_rebase, make_commit, move_tag
 
 
-def _make_repo_config(git_repo: GitRepo, last_sync: LastSync | None = None) -> RepoConfig:
+def _make_repo_config(
+    git_repo: GitRepo,
+    last_sync: LastSync | None = None,
+    lfs_mode: str | None = None,
+) -> RepoConfig:
     return RepoConfig(
         id="test/repo",
         source_url=str(git_repo.path),
         dest_path=str(git_repo.bare_path),
         source_local_path=str(git_repo.path),
         last_sync=last_sync,
+        lfs_mode=lfs_mode,
     )
 
 
@@ -119,14 +124,31 @@ class TestPlanBundle:
     def test_lfs_raises(self, lfs_repo: GitRepo) -> None:
         repo = _make_repo_config(lfs_repo)
         current_refs = list_refs(lfs_repo.path)
-        with pytest.raises(LFSDetectedError):
+        with pytest.raises(LFSDetectedError, match="lfs_mode"):
             plan_bundle(repo, current_refs, lfs_repo.path)
 
-    def test_lfs_allowed(self, lfs_repo: GitRepo) -> None:
-        repo = _make_repo_config(lfs_repo)
+    def test_lfs_allow_mode(self, lfs_repo: GitRepo) -> None:
+        repo = _make_repo_config(lfs_repo, lfs_mode="allow")
         current_refs = list_refs(lfs_repo.path)
-        plan = plan_bundle(repo, current_refs, lfs_repo.path, allow_lfs=True)
+        plan = plan_bundle(repo, current_refs, lfs_repo.path)
         assert plan.is_full_bundle is True
+        assert any("lfs" in w.lower() for w in plan.warnings)
+
+    def test_lfs_skip_mode_all_refs_filtered(self, lfs_repo: GitRepo) -> None:
+        repo = _make_repo_config(lfs_repo, lfs_mode="skip")
+        current_refs = list_refs(lfs_repo.path)
+        plan = plan_bundle(repo, current_refs, lfs_repo.path)
+        assert plan.no_changes is True
+        assert plan.refs_to_bundle == []
+        assert any("lfs" in w.lower() for w in plan.warnings)
+
+    def test_lfs_skip_mode_partial(self, mixed_lfs_repo: GitRepo) -> None:
+        repo = _make_repo_config(mixed_lfs_repo, lfs_mode="skip")
+        current_refs = list_refs(mixed_lfs_repo.path)
+        plan = plan_bundle(repo, current_refs, mixed_lfs_repo.path)
+        assert plan.no_changes is False
+        assert "refs/heads/no-lfs" in plan.refs_to_bundle
+        assert "refs/heads/main" not in plan.refs_to_bundle
         assert any("lfs" in w.lower() for w in plan.warnings)
 
     def test_case_conflict_raises(self, git_repo: GitRepo) -> None:

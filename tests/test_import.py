@@ -21,7 +21,6 @@ def _export(
             state_path=state_path,
             output_path=output_path,
             workers=workers,
-            allow_lfs=False,
             allow_rebase=allow_rebase,
             dry_run=False,
         )

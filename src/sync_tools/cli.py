@@ -39,12 +39,6 @@ def main() -> None:
     help=f"Thread pool size (default: {_default_workers()}).",
 )
 @click.option(
-    "--allow-lfs",
-    is_flag=True,
-    default=False,
-    help="Continue export even if LFS objects detected (pointer files only; data not included).",
-)
-@click.option(
     "--allow-rebase",
     is_flag=True,
     default=False,
@@ -61,7 +55,6 @@ def export_cmd(
     state_file: pathlib.Path,
     output: pathlib.Path,
     workers: int | None,
-    allow_lfs: bool,
     allow_rebase: bool,
     dry_run: bool,
     verbose: bool,
@@ -78,7 +71,6 @@ def export_cmd(
         state_path=state_file,
         output_path=output,
         workers=workers or _default_workers(),
-        allow_lfs=allow_lfs,
         allow_rebase=allow_rebase,
         dry_run=dry_run,
         verbose=verbose,

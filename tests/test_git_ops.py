@@ -13,6 +13,7 @@ from sync_tools.git_ops import (
     is_ancestor,
     is_git_repo,
     list_refs,
+    refs_with_lfs,
     resolve_ref,
     run_git,
 )
@@ -81,6 +82,23 @@ class TestIsAncestor:
 class TestHasLfsObjects:
     def test_no_lfs_in_normal_repo(self, git_repo: GitRepo) -> None:
         assert has_lfs_objects(git_repo.path) is False
+
+
+class TestRefsWithLfs:
+    def test_no_lfs_in_normal_repo(self, git_repo: GitRepo) -> None:
+        refs = list(list_refs(git_repo.path).keys())
+        assert refs_with_lfs(git_repo.path, refs) == set()
+
+    def test_all_refs_have_lfs(self, lfs_repo: GitRepo) -> None:
+        refs = list(list_refs(lfs_repo.path).keys())
+        result = refs_with_lfs(lfs_repo.path, refs)
+        assert "refs/heads/main" in result
+
+    def test_partial_lfs(self, mixed_lfs_repo: GitRepo) -> None:
+        refs = list(list_refs(mixed_lfs_repo.path).keys())
+        result = refs_with_lfs(mixed_lfs_repo.path, refs)
+        assert "refs/heads/main" in result
+        assert "refs/heads/no-lfs" not in result
 
 
 class TestFindCaseConflicts:

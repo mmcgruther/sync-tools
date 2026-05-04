@@ -24,6 +24,7 @@ class RepoConfig:
     dest_path: str
     source_local_path: str | None = None
     last_sync: LastSync | None = None
+    lfs_mode: str | None = None  # None=fail on LFS, "skip"=skip LFS refs, "allow"=include with warning
 
 
 def load_state(path: pathlib.Path) -> list[RepoConfig]:
@@ -92,12 +93,21 @@ def _parse_repo(raw: object, path: pathlib.Path) -> RepoConfig:
             raise StateFileError(f"'last_sync.refs' must be a JSON object in {path}")
         last_sync = LastSync(timestamp=ts, refs=refs)
 
+    lfs_mode_raw = raw.get("lfs_mode")
+    if lfs_mode_raw is not None:
+        if lfs_mode_raw not in ("skip", "allow"):
+            raise StateFileError(
+                f"'lfs_mode' must be 'skip' or 'allow' (got {lfs_mode_raw!r}) in {path}"
+            )
+    lfs_mode: str | None = lfs_mode_raw
+
     return RepoConfig(
         id=req("id"),
         source_url=req("source_url"),
         dest_path=req("dest_path"),
         source_local_path=raw.get("source_local_path") or None,
         last_sync=last_sync,
+        lfs_mode=lfs_mode,
     )
 
 
@@ -109,6 +119,8 @@ def _repo_to_dict(repo: RepoConfig) -> dict:
     }
     if repo.source_local_path:
         d["source_local_path"] = repo.source_local_path
+    if repo.lfs_mode:
+        d["lfs_mode"] = repo.lfs_mode
     if repo.last_sync:
         d["last_sync"] = {
             "timestamp": repo.last_sync.timestamp,

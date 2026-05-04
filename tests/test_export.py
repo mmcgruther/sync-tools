@@ -14,7 +14,6 @@ def _make_options(
     state_path: pathlib.Path,
     output_path: pathlib.Path,
     *,
-    allow_lfs: bool = False,
     allow_rebase: bool = False,
     dry_run: bool = False,
     workers: int = 1,
@@ -23,7 +22,6 @@ def _make_options(
         state_path=state_path,
         output_path=output_path,
         workers=workers,
-        allow_lfs=allow_lfs,
         allow_rebase=allow_rebase,
         dry_run=dry_run,
     )
@@ -140,15 +138,59 @@ class TestNoChanges:
 
 
 class TestLFSHandling:
+    def _lfs_state(self, lfs_repo: GitRepo, extra: dict | None = None) -> dict:
+        repo_entry: dict = {
+            "id": "test/lfs",
+            "source_url": str(lfs_repo.path),
+            "source_local_path": str(lfs_repo.path),
+            "dest_path": str(lfs_repo.bare_path),
+        }
+        if extra:
+            repo_entry.update(extra)
+        return {"version": "1", "repos": [repo_entry]}
+
     def test_lfs_fails_by_default(self, tmp_path: pathlib.Path, lfs_repo: GitRepo) -> None:
+        state_path = tmp_path / "state.json"
+        state_path.write_text(json.dumps(self._lfs_state(lfs_repo)), encoding="utf-8")
+        out = tmp_path / "out.tar.gz"
+        summary = run_export(_make_options(state_path, out))
+        assert len(summary.failed) == 1
+        assert "lfs" in summary.failed[0][1].lower()
+
+    def test_lfs_allow_mode(self, tmp_path: pathlib.Path, lfs_repo: GitRepo) -> None:
+        state_path = tmp_path / "state.json"
+        state_path.write_text(
+            json.dumps(self._lfs_state(lfs_repo, {"lfs_mode": "allow"})), encoding="utf-8"
+        )
+        out = tmp_path / "out.tar.gz"
+        summary = run_export(_make_options(state_path, out))
+        assert len(summary.failed) == 0
+        assert "test/lfs" in summary.succeeded
+        assert any("lfs" in w.lower() for _, ws in summary.warned for w in ws)
+
+    def test_lfs_skip_mode_skips_all(self, tmp_path: pathlib.Path, lfs_repo: GitRepo) -> None:
+        state_path = tmp_path / "state.json"
+        state_path.write_text(
+            json.dumps(self._lfs_state(lfs_repo, {"lfs_mode": "skip"})), encoding="utf-8"
+        )
+        out = tmp_path / "out.tar.gz"
+        summary = run_export(_make_options(state_path, out))
+        assert len(summary.failed) == 0
+        assert "test/lfs" in summary.skipped
+        assert any("lfs" in w.lower() for _, ws in summary.warned for w in ws)
+
+    def test_lfs_skip_mode_bundles_non_lfs_branch(
+        self, tmp_path: pathlib.Path, mixed_lfs_repo: GitRepo
+    ) -> None:
         state = {
             "version": "1",
             "repos": [
                 {
-                    "id": "test/lfs",
-                    "source_url": str(lfs_repo.path),
-                    "source_local_path": str(lfs_repo.path),
-                    "dest_path": str(lfs_repo.bare_path),
+                    "id": "test/mixed",
+                    "source_url": str(mixed_lfs_repo.path),
+                    "source_local_path": str(mixed_lfs_repo.path),
+                    "dest_path": str(mixed_lfs_repo.bare_path),
+                    "lfs_mode": "skip",
                 }
             ],
         }
@@ -156,28 +198,10 @@ class TestLFSHandling:
         state_path.write_text(json.dumps(state), encoding="utf-8")
         out = tmp_path / "out.tar.gz"
         summary = run_export(_make_options(state_path, out))
-        assert len(summary.failed) == 1
-        assert "lfs" in summary.failed[0][1].lower()
-
-    def test_lfs_allowed_with_flag(self, tmp_path: pathlib.Path, lfs_repo: GitRepo) -> None:
-        state = {
-            "version": "1",
-            "repos": [
-                {
-                    "id": "test/lfs",
-                    "source_url": str(lfs_repo.path),
-                    "source_local_path": str(lfs_repo.path),
-                    "dest_path": str(lfs_repo.bare_path),
-                }
-            ],
-        }
-        state_path = tmp_path / "state.json"
-        state_path.write_text(json.dumps(state), encoding="utf-8")
-        out = tmp_path / "out.tar.gz"
-        summary = run_export(_make_options(state_path, out, allow_lfs=True))
         assert len(summary.failed) == 0
-        assert "test/lfs" in summary.succeeded
-        assert any("lfs" in w.lower() for warns in [w for _, w in summary.warned] for w in warns)
+        assert "test/mixed" in summary.succeeded
+        assert out.exists()
+        assert any("lfs" in w.lower() for _, ws in summary.warned for w in ws)
 
 
 class TestRebaseHandling:
