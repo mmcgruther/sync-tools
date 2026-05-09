@@ -4,8 +4,6 @@ import json
 import pathlib
 import tarfile
 
-import pytest
-
 from sync_tools.docker_export_cmd import DockerExportOptions, run_docker_export
 from sync_tools.docker_state import load_docker_state
 

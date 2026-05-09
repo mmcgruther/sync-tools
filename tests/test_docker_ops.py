@@ -57,7 +57,6 @@ class TestDockerOps:
     def test_docker_load_returns_id(
         self, docker_available: None, docker_image: str, tmp_path: pathlib.Path
     ) -> None:
-        import uuid
 
         out = tmp_path / "image.tar"
         docker_save([docker_image], out)

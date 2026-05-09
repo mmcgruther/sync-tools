@@ -3,8 +3,8 @@ from __future__ import annotations
 import pathlib
 from dataclasses import dataclass, field
 
-from .docker_ops import docker_save, get_image_digest
-from .docker_state import ImageConfig, LastImageSync
+from .docker_ops import docker_save
+from .docker_state import ImageConfig
 
 
 def safe_image_id(image_id: str) -> str:

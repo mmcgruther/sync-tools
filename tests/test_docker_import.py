@@ -6,8 +6,6 @@ import pathlib
 import tarfile
 import unittest.mock as mock
 
-import pytest
-
 from sync_tools.docker_export_cmd import DockerExportOptions, run_docker_export
 from sync_tools.docker_import_cmd import DockerImportOptions, run_docker_import
 

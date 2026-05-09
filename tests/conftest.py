@@ -9,6 +9,7 @@ from __future__ import annotations
 import pathlib
 import shutil
 import subprocess
+from collections.abc import Generator
 from typing import NamedTuple
 
 import pytest
@@ -190,11 +191,10 @@ def docker_available() -> None:
 
 
 @pytest.fixture()
-def docker_image(tmp_path: pathlib.Path, docker_available: None) -> "Generator[str, None, None]":
+def docker_image(tmp_path: pathlib.Path, docker_available: None) -> Generator[str, None, None]:
     """Build a minimal linux/amd64 test image. Yields image tag; removes on teardown."""
     import subprocess
     import uuid
-    from typing import Generator
 
     tag = f"sync-tools-test:{uuid.uuid4().hex[:8]}"
     dockerfile = tmp_path / "Dockerfile"
@@ -211,11 +211,10 @@ def docker_image(tmp_path: pathlib.Path, docker_available: None) -> "Generator[s
 
 
 @pytest.fixture()
-def docker_image_v2(tmp_path: pathlib.Path, docker_available: None, docker_image: str) -> "Generator[str, None, None]":
+def docker_image_v2(tmp_path: pathlib.Path, docker_available: None, docker_image: str) -> Generator[str, None, None]:
     """Build a second image layered on docker_image. Yields tag; removes on teardown."""
     import subprocess
     import uuid
-    from typing import Generator
 
     tag = f"sync-tools-test-v2:{uuid.uuid4().hex[:8]}"
     dockerfile = tmp_path / "Dockerfile.v2"

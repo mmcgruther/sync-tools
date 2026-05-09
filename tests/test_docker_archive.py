@@ -6,7 +6,6 @@ import tarfile
 import pytest
 
 from sync_tools.docker_archive import (
-    DockerManifestEntry,
     create_docker_archive,
     extract_docker_archive,
 )
