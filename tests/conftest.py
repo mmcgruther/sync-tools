@@ -180,6 +180,58 @@ def mixed_lfs_repo(tmp_path: pathlib.Path) -> GitRepo:
     return GitRepo(path=src, bare_path=bare)
 
 
+@pytest.fixture(scope="session")
+def docker_available() -> None:
+    """Skip test if Docker daemon is not reachable."""
+    from sync_tools.docker_ops import is_docker_available
+
+    if not is_docker_available():
+        pytest.skip("Docker daemon not available")
+
+
+@pytest.fixture()
+def docker_image(tmp_path: pathlib.Path, docker_available: None) -> "Generator[str, None, None]":
+    """Build a minimal linux/amd64 test image. Yields image tag; removes on teardown."""
+    import subprocess
+    import uuid
+    from typing import Generator
+
+    tag = f"sync-tools-test:{uuid.uuid4().hex[:8]}"
+    dockerfile = tmp_path / "Dockerfile"
+    # FROM scratch is not pullable/inspectable so use busybox (tiny)
+    dockerfile.write_text("FROM busybox:1.36\nRUN echo hello > /greeting.txt\n", encoding="utf-8")
+    subprocess.run(
+        ["docker", "build", "--platform", "linux/amd64", "-t", tag, "."],
+        cwd=str(tmp_path),
+        check=True,
+        capture_output=True,
+    )
+    yield tag
+    subprocess.run(["docker", "rmi", "-f", tag], capture_output=True)
+
+
+@pytest.fixture()
+def docker_image_v2(tmp_path: pathlib.Path, docker_available: None, docker_image: str) -> "Generator[str, None, None]":
+    """Build a second image layered on docker_image. Yields tag; removes on teardown."""
+    import subprocess
+    import uuid
+    from typing import Generator
+
+    tag = f"sync-tools-test-v2:{uuid.uuid4().hex[:8]}"
+    dockerfile = tmp_path / "Dockerfile.v2"
+    dockerfile.write_text(
+        f"FROM {docker_image}\nRUN echo world > /greeting2.txt\n", encoding="utf-8"
+    )
+    subprocess.run(
+        ["docker", "build", "--platform", "linux/amd64", "-t", tag, "-f", "Dockerfile.v2", "."],
+        cwd=str(tmp_path),
+        check=True,
+        capture_output=True,
+    )
+    yield tag
+    subprocess.run(["docker", "rmi", "-f", tag], capture_output=True)
+
+
 @pytest.fixture()
 def state_file(tmp_path: pathlib.Path, git_repo: GitRepo) -> pathlib.Path:
     """Write a minimal state JSON for git_repo with no last_sync (first-time export)."""

@@ -60,6 +60,22 @@ class LFSObjectMissingError(SyncToolsError):
     """One or more LFS objects referenced by the repo are not available locally."""
 
 
+class DockerCommandError(SyncToolsError):
+    """A docker subprocess call returned non-zero or timed out."""
+
+    def __init__(self, cmd: list[str], returncode: int, stderr: str) -> None:
+        self.cmd = cmd
+        self.returncode = returncode
+        self.stderr = stderr
+        super().__init__(
+            f"docker command failed (exit {returncode}): {' '.join(cmd)}\n{stderr}".strip()
+        )
+
+
+class DockerNotInstalledError(SyncToolsError):
+    """docker CLI not found in PATH."""
+
+
 @dataclass
 class RepoResult:
     """Holds per-repo outcome for parallel execution. Workers always return this, never re-raise."""
