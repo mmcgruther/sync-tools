@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import sys
 import tarfile
 from dataclasses import dataclass, field
 
@@ -105,7 +106,11 @@ def _safe_extract(tar: tarfile.TarFile, extract_dir: pathlib.Path) -> None:
         member_path = (extract_dir / member.name).resolve()
         if not str(member_path).startswith(str(resolved_base)):
             raise BundleError(f"Archive contains path traversal attempt: {member.name!r}")
-    tar.extractall(extract_dir)  # noqa: S202 — members validated above
+    # filter= added in 3.12; on 3.11 path validation above is the only guard
+    if sys.version_info >= (3, 12):
+        tar.extractall(extract_dir, filter="fully_trusted")  # noqa: S202
+    else:
+        tar.extractall(extract_dir)  # noqa: S202
 
 
 def _manifest_to_dict(manifest: Manifest) -> dict:

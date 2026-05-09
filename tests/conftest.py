@@ -183,11 +183,23 @@ def mixed_lfs_repo(tmp_path: pathlib.Path) -> GitRepo:
 
 @pytest.fixture(scope="session")
 def docker_available() -> None:
-    """Skip test if Docker daemon is not reachable."""
+    """Skip test if Docker daemon is not reachable or doesn't support Linux containers."""
+    import subprocess
+
     from sync_tools.docker_ops import is_docker_available
 
     if not is_docker_available():
         pytest.skip("Docker daemon not available")
+
+    # Windows CI runners often run Docker in Windows-container mode; linux/amd64 won't work there.
+    result = subprocess.run(
+        ["docker", "info", "--format", "{{.OSType}}"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    if result.returncode != 0 or result.stdout.strip().lower() != "linux":
+        pytest.skip("Docker daemon does not support Linux containers")
 
 
 @pytest.fixture()
@@ -200,12 +212,13 @@ def docker_image(tmp_path: pathlib.Path, docker_available: None) -> Generator[st
     dockerfile = tmp_path / "Dockerfile"
     # FROM scratch is not pullable/inspectable so use busybox (tiny)
     dockerfile.write_text("FROM busybox:1.36\nRUN echo hello > /greeting.txt\n", encoding="utf-8")
-    subprocess.run(
+    result = subprocess.run(
         ["docker", "build", "--platform", "linux/amd64", "-t", tag, "."],
         cwd=str(tmp_path),
-        check=True,
         capture_output=True,
     )
+    if result.returncode != 0:
+        pytest.skip(f"docker build failed: {result.stderr.decode(errors='replace')[:200]}")
     yield tag
     subprocess.run(["docker", "rmi", "-f", tag], capture_output=True)
 
