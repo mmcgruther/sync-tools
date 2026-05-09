@@ -46,9 +46,7 @@ def _options(
 
 
 class TestDockerExportHappyPath:
-    def test_creates_archive(
-        self, docker_available: None, tmp_path: pathlib.Path
-    ) -> None:
+    def test_creates_archive(self, docker_available: None, tmp_path: pathlib.Path) -> None:
         state_path = tmp_path / "state.json"
         state_path.write_text(json.dumps(_make_state()), encoding="utf-8")
         out = tmp_path / "out.tar.gz"
@@ -96,18 +94,14 @@ class TestDockerExportHappyPath:
 
 
 class TestDockerExportDryRun:
-    def test_no_archive_created(
-        self, docker_available: None, tmp_path: pathlib.Path
-    ) -> None:
+    def test_no_archive_created(self, docker_available: None, tmp_path: pathlib.Path) -> None:
         state_path = tmp_path / "state.json"
         state_path.write_text(json.dumps(_make_state()), encoding="utf-8")
         out = tmp_path / "out.tar.gz"
         run_docker_export(_options(state_path, out, dry_run=True))
         assert not out.exists()
 
-    def test_state_not_updated(
-        self, docker_available: None, tmp_path: pathlib.Path
-    ) -> None:
+    def test_state_not_updated(self, docker_available: None, tmp_path: pathlib.Path) -> None:
         state_path = tmp_path / "state.json"
         state_path.write_text(json.dumps(_make_state()), encoding="utf-8")
         out = tmp_path / "out.tar.gz"

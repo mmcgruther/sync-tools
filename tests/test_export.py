@@ -183,7 +183,9 @@ class TestLFSHandling:
         self, tmp_path: pathlib.Path, lfs_repo: GitRepo
     ) -> None:
         state_path = tmp_path / "state.json"
-        state_path.write_text(json.dumps(self._lfs_state(lfs_repo, {"lfs_mode": "sync"})), encoding="utf-8")
+        state_path.write_text(
+            json.dumps(self._lfs_state(lfs_repo, {"lfs_mode": "sync"})), encoding="utf-8"
+        )
         out = tmp_path / "out.tar.gz"
         summary = run_export(_make_options(state_path, out))
         assert len(summary.failed) == 0
@@ -197,7 +199,9 @@ class TestLFSHandling:
         self, tmp_path: pathlib.Path, lfs_repo: GitRepo
     ) -> None:
         state_path = tmp_path / "state.json"
-        state_path.write_text(json.dumps(self._lfs_state(lfs_repo, {"lfs_mode": "sync"})), encoding="utf-8")
+        state_path.write_text(
+            json.dumps(self._lfs_state(lfs_repo, {"lfs_mode": "sync"})), encoding="utf-8"
+        )
 
         out1 = tmp_path / "out1.tar.gz"
         run_export(_make_options(state_path, out1))
@@ -214,7 +218,9 @@ class TestLFSHandling:
         from sync_tools.state import load_state
 
         state_path = tmp_path / "state.json"
-        state_path.write_text(json.dumps(self._lfs_state(lfs_repo, {"lfs_mode": "sync"})), encoding="utf-8")
+        state_path.write_text(
+            json.dumps(self._lfs_state(lfs_repo, {"lfs_mode": "sync"})), encoding="utf-8"
+        )
         out = tmp_path / "out.tar.gz"
         run_export(_make_options(state_path, out))
         repos = load_state(state_path)

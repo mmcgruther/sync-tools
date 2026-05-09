@@ -276,9 +276,7 @@ class TestLFSSyncImport:
             ],
         }
 
-    def test_lfs_objects_copied_to_dest(
-        self, tmp_path: pathlib.Path, lfs_repo: GitRepo
-    ) -> None:
+    def test_lfs_objects_copied_to_dest(self, tmp_path: pathlib.Path, lfs_repo: GitRepo) -> None:
         fresh_dest = tmp_path / "fresh-dest.git"
         _git(["init", "--bare", str(fresh_dest)], tmp_path)
 
@@ -308,9 +306,7 @@ class TestLFSSyncImport:
         lfs_files = [f for f in lfs_files if f.is_file()]
         assert len(lfs_files) > 0
 
-    def test_dry_run_skips_lfs_copy(
-        self, tmp_path: pathlib.Path, lfs_repo: GitRepo
-    ) -> None:
+    def test_dry_run_skips_lfs_copy(self, tmp_path: pathlib.Path, lfs_repo: GitRepo) -> None:
         fresh_dest = tmp_path / "fresh-dest.git"
         _git(["init", "--bare", str(fresh_dest)], tmp_path)
 

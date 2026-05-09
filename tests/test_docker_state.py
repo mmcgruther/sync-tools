@@ -141,11 +141,7 @@ class TestSaveDockerState:
 
     def test_no_last_sync_omitted(self, tmp_path: pathlib.Path) -> None:
         path = tmp_path / "out.json"
-        images = [
-            ImageConfig(
-                id="x/y", source_ref="s", dest_ref="d", tags=["t"], last_sync=None
-            )
-        ]
+        images = [ImageConfig(id="x/y", source_ref="s", dest_ref="d", tags=["t"], last_sync=None)]
         save_docker_state(path, images)
         raw = json.loads(path.read_text(encoding="utf-8"))
         assert "last_sync" not in raw["images"][0]

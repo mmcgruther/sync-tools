@@ -45,9 +45,9 @@ def docker_load(tar_path: pathlib.Path, timeout: int = 300) -> str:
     result = _run(["docker", "load", "-i", str(tar_path)], timeout=timeout)
     for line in result.stdout.splitlines():
         if line.startswith("Loaded image ID:"):
-            return line[len("Loaded image ID:"):].strip()
+            return line[len("Loaded image ID:") :].strip()
         if line.startswith("Loaded image:"):
-            return line[len("Loaded image:"):].strip()
+            return line[len("Loaded image:") :].strip()
     return result.stdout.strip()
 
 

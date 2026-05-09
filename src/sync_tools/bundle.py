@@ -74,9 +74,7 @@ def plan_bundle(
                 "Git LFS detected: bundle contains only pointer files, not actual LFS object data."
             )
         elif repo.lfs_mode == "sync":
-            warnings.append(
-                "Git LFS detected: LFS objects will be included in the sync archive."
-            )
+            warnings.append("Git LFS detected: LFS objects will be included in the sync archive.")
         else:
             raise LFSDetectedError(
                 f"Repo {repo.id} uses Git LFS. Bundles contain only pointer files, not "

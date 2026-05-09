@@ -74,7 +74,9 @@ class TestPlanImageBundle:
 
 
 class TestExecuteImageBundle:
-    def test_creates_tar(self, docker_available: None, docker_image: str, tmp_path: pathlib.Path) -> None:
+    def test_creates_tar(
+        self, docker_available: None, docker_image: str, tmp_path: pathlib.Path
+    ) -> None:
 
         # Extract base and tag from docker_image (e.g. "sync-tools-test:abc123")
         base, tag = docker_image.rsplit(":", 1)

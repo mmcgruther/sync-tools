@@ -18,10 +18,10 @@ class LastImageSync:
 
 @dataclass
 class ImageConfig:
-    id: str           # e.g. "myapp/backend"
-    source_ref: str   # base ref without tag
-    dest_ref: str     # base ref without tag
-    tags: list[str]   # tags to sync (same for source + dest)
+    id: str  # e.g. "myapp/backend"
+    source_ref: str  # base ref without tag
+    dest_ref: str  # base ref without tag
+    tags: list[str]  # tags to sync (same for source + dest)
     last_sync: LastImageSync | None = None
 
 

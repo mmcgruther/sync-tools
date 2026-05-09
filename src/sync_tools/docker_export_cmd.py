@@ -51,10 +51,7 @@ def run_docker_export(options: DockerExportOptions) -> DockerExportSummary:
         image_results: list[_ImageResult] = []
 
         with ThreadPoolExecutor(max_workers=options.workers) as pool:
-            future_to_image = {
-                pool.submit(_export_one_image, img, tmp_dir): img
-                for img in images
-            }
+            future_to_image = {pool.submit(_export_one_image, img, tmp_dir): img for img in images}
             for future in as_completed(future_to_image):
                 image_results.append(future.result())
 

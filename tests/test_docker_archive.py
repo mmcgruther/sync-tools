@@ -109,6 +109,7 @@ class TestExtractDockerArchive:
             info = tarfile.TarInfo(name="../../evil.txt")
             info.size = 4
             import io
+
             tar.addfile(info, io.BytesIO(b"evil"))
 
         extract_dir = tmp_path / "extracted"

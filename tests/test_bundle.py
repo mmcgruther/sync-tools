@@ -190,7 +190,9 @@ class TestExecuteBundle:
         for ref in plan.refs_to_bundle:
             assert result.exported_refs[ref] == current_refs[ref]
 
-    def test_lfs_sync_mode_collects_objects(self, lfs_repo: GitRepo, tmp_path: pathlib.Path) -> None:
+    def test_lfs_sync_mode_collects_objects(
+        self, lfs_repo: GitRepo, tmp_path: pathlib.Path
+    ) -> None:
         current_refs = list_refs(lfs_repo.path)
         repo = _make_repo_config(lfs_repo, lfs_mode="sync")
         plan = plan_bundle(repo, current_refs, lfs_repo.path)
@@ -212,7 +214,9 @@ class TestExecuteBundle:
         # Second execute with all OIDs already in last_sync
         repo2 = _make_repo_config(
             lfs_repo,
-            last_sync=LastSync(timestamp="2024-01-01T00:00:00Z", refs=dict(current_refs), lfs_oids=known_oids),
+            last_sync=LastSync(
+                timestamp="2024-01-01T00:00:00Z", refs=dict(current_refs), lfs_oids=known_oids
+            ),
             lfs_mode="sync",
         )
         plan2 = plan_bundle(repo2, current_refs, lfs_repo.path)
@@ -220,6 +224,7 @@ class TestExecuteBundle:
         # Even if we forced execute, lfs_objects would be empty — verify logic directly
         # by checking that new_oids = all_oids - already_synced = empty
         from sync_tools.git_ops import lfs_oids_for_refs
+
         all_oids = lfs_oids_for_refs(lfs_repo.path, list(current_refs.keys()))
         new_oids = all_oids - set(known_oids)
         assert new_oids == set()

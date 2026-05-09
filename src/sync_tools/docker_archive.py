@@ -20,7 +20,7 @@ class DockerManifestEntry:
     source_ref: str
     dest_ref: str
     synced_tag_digests: dict[str, str]  # tag -> digest at time of export
-    image_filename: str                  # e.g. "images/myapp__backend/image.tar"
+    image_filename: str  # e.g. "images/myapp__backend/image.tar"
 
 
 @dataclass
@@ -58,9 +58,7 @@ def create_docker_archive(
         entries=entries,
     )
     manifest_path = tmp_dir / _DOCKER_MANIFEST_NAME
-    manifest_path.write_text(
-        json.dumps(_manifest_to_dict(manifest), indent=2), encoding="utf-8"
-    )
+    manifest_path.write_text(json.dumps(_manifest_to_dict(manifest), indent=2), encoding="utf-8")
 
     with tarfile.open(output_path, "w:gz") as tar:
         tar.add(str(manifest_path), arcname=_DOCKER_MANIFEST_NAME)

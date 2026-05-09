@@ -28,17 +28,13 @@ def _make_state(source_ref: str = _SOURCE_REF, dest_ref: str = "dst.invalid/img"
     }
 
 
-def _export_options(
-    state_path: pathlib.Path, output_path: pathlib.Path
-) -> DockerExportOptions:
+def _export_options(state_path: pathlib.Path, output_path: pathlib.Path) -> DockerExportOptions:
     return DockerExportOptions(
         state_path=state_path, output_path=output_path, workers=1, dry_run=False
     )
 
 
-def _import_options(
-    archive_path: pathlib.Path, dry_run: bool = False
-) -> DockerImportOptions:
+def _import_options(archive_path: pathlib.Path, dry_run: bool = False) -> DockerImportOptions:
     return DockerImportOptions(archive_path=archive_path, workers=1, dry_run=dry_run)
 
 
@@ -53,9 +49,7 @@ def _build_export_archive(tmp_path: pathlib.Path) -> pathlib.Path:
 
 
 class TestDockerImportDryRun:
-    def test_dry_run_skips_docker_ops(
-        self, docker_available: None, tmp_path: pathlib.Path
-    ) -> None:
+    def test_dry_run_skips_docker_ops(self, docker_available: None, tmp_path: pathlib.Path) -> None:
         archive = _build_export_archive(tmp_path)
         summary = run_docker_import(_import_options(archive, dry_run=True))
         assert summary.failed == []
@@ -92,9 +86,7 @@ class TestDockerImportDryRun:
 
 
 class TestDockerImportRoundTrip:
-    def test_load_and_tag_succeed(
-        self, docker_available: None, tmp_path: pathlib.Path
-    ) -> None:
+    def test_load_and_tag_succeed(self, docker_available: None, tmp_path: pathlib.Path) -> None:
         """
         Full round-trip: export busybox, then import it (with push mocked to no-op).
         Verifies load and tag steps succeed by patching push (no real registry needed).

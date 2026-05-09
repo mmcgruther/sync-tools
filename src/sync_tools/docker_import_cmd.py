@@ -77,9 +77,7 @@ def _import_one_image(
     try:
         image_tar = extract_dir / entry.image_filename
         if not image_tar.exists():
-            raise SyncToolsError(
-                f"Image tar not found in archive: {entry.image_filename}"
-            )
+            raise SyncToolsError(f"Image tar not found in archive: {entry.image_filename}")
 
         if dry_run:
             return _ImportResult(image_id=entry.id, success=True)

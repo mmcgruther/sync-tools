@@ -25,7 +25,9 @@ class RepoConfig:
     dest_path: str
     source_local_path: str | None = None
     last_sync: LastSync | None = None
-    lfs_mode: str | None = None  # None=fail on LFS, "skip"=skip LFS refs, "allow"=include with warning
+    lfs_mode: str | None = (
+        None  # None=fail on LFS, "skip"=skip LFS refs, "allow"=include with warning
+    )
 
 
 def load_state(path: pathlib.Path) -> list[RepoConfig]:
