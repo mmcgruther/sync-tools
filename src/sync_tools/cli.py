@@ -12,6 +12,8 @@ from .docker_import_cmd import DockerImportOptions, DockerImportSummary, run_doc
 from .errors import StateFileError, SyncToolsError
 from .export_cmd import ExportOptions, ExportSummary, run_export
 from .import_cmd import ImportOptions, ImportSummary, run_import
+from .pypi_export_cmd import PyPIExportOptions, PyPIExportSummary, run_pypi_export
+from .pypi_import_cmd import PyPIImportOptions, PyPIImportSummary, run_pypi_import
 
 
 def _default_workers() -> int:
@@ -356,6 +358,161 @@ def _print_docker_import_summary(
             click.echo(f"  {tag} {img_id}" + (f": {warn_str}" if warns else ""))
         for img_id, error_msg in summary.failed:
             click.echo(f"  FAIL {img_id}: {error_msg}", err=True)
+
+
+@main.command("pypi-export")
+@click.argument("state_file", type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path))
+@click.option(
+    "--output",
+    "-o",
+    required=True,
+    type=click.Path(dir_okay=False, path_type=pathlib.Path),
+    help="Output archive path (.tar.gz).",
+)
+@click.option(
+    "--workers",
+    "-w",
+    default=None,
+    type=int,
+    help=f"Thread pool size (default: {_default_workers()}).",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Download packages and detect changes without creating archive or updating state.",
+)
+@click.option("--verbose", "-v", is_flag=True, default=False)
+def pypi_export_cmd(
+    state_file: pathlib.Path,
+    output: pathlib.Path,
+    workers: int | None,
+    dry_run: bool,
+    verbose: bool,
+) -> None:
+    """Read STATE_FILE, download PyPI packages, write archive, update state.
+
+    \b
+    Exit codes:
+      0  all packages succeeded
+      1  at least one package failed (others may have succeeded)
+      2  fatal error (state file unreadable, invalid, etc.)
+    """
+    options = PyPIExportOptions(
+        state_path=state_file,
+        output_path=output,
+        workers=workers or _default_workers(),
+        dry_run=dry_run,
+        verbose=verbose,
+    )
+
+    try:
+        summary = run_pypi_export(options)
+    except StateFileError as exc:
+        click.echo(f"FATAL: {exc}", err=True)
+        sys.exit(2)
+    except SyncToolsError as exc:
+        click.echo(f"FATAL: {exc}", err=True)
+        sys.exit(2)
+
+    _print_pypi_export_summary(summary, verbose=verbose, dry_run=dry_run)
+    sys.exit(1 if summary.failed else 0)
+
+
+@main.command("pypi-import")
+@click.argument("archive", type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path))
+@click.option(
+    "--workers",
+    "-w",
+    default=None,
+    type=int,
+    help=f"Thread pool size (default: {_default_workers()}).",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Verify archive integrity without copying files to destination.",
+)
+@click.option("--verbose", "-v", is_flag=True, default=False)
+def pypi_import_cmd(
+    archive: pathlib.Path,
+    workers: int | None,
+    dry_run: bool,
+    verbose: bool,
+) -> None:
+    """Extract ARCHIVE and copy PyPI packages to destination directories.
+
+    \b
+    Exit codes:
+      0  all packages succeeded
+      1  at least one package failed (others may have succeeded)
+      2  fatal error (archive unreadable, manifest invalid, etc.)
+    """
+    options = PyPIImportOptions(
+        archive_path=archive,
+        workers=workers or _default_workers(),
+        dry_run=dry_run,
+        verbose=verbose,
+    )
+
+    try:
+        summary = run_pypi_import(options)
+    except SyncToolsError as exc:
+        click.echo(f"FATAL: {exc}", err=True)
+        sys.exit(2)
+
+    _print_pypi_import_summary(summary, verbose=verbose, dry_run=dry_run)
+    sys.exit(1 if summary.failed else 0)
+
+
+def _print_pypi_export_summary(summary: PyPIExportSummary, verbose: bool, dry_run: bool) -> None:
+    prefix = "[DRY RUN] " if dry_run else ""
+    warn_ids = {pkg_id for pkg_id, _ in summary.warned}
+
+    click.echo(
+        f"{prefix}PyPI export complete: {len(summary.succeeded)} exported, "
+        f"{len(summary.skipped)} skipped (no changes), "
+        f"{len(summary.failed)} failed"
+        + (f", {len(summary.warned)} with warnings" if summary.warned else "")
+    )
+
+    if verbose or summary.failed or summary.warned:
+        warned_map = {pkg_id: warns for pkg_id, warns in summary.warned}
+        for pkg_id in summary.succeeded:
+            tag = "WARN" if pkg_id in warn_ids else "  OK"
+            warns = warned_map.get(pkg_id, [])
+            warn_str = "; ".join(warns)
+            click.echo(f"  {tag} {pkg_id}" + (f": {warn_str}" if warns else ""))
+        for pkg_id in summary.skipped:
+            if verbose:
+                click.echo(f"  SKIP {pkg_id}: no changes since last sync")
+        for pkg_id, error_msg in summary.failed:
+            click.echo(f"  FAIL {pkg_id}: {error_msg}", err=True)
+
+    if summary.archive_path:
+        click.echo(f"Archive: {summary.archive_path}")
+
+
+def _print_pypi_import_summary(summary: PyPIImportSummary, verbose: bool, dry_run: bool) -> None:
+    prefix = "[DRY RUN] " if dry_run else ""
+    warn_ids = {pkg_id for pkg_id, _ in summary.warned}
+
+    click.echo(
+        f"{prefix}PyPI import complete: {len(summary.succeeded)} succeeded, "
+        f"{len(summary.failed)} failed"
+        + (f", {len(summary.warned)} with warnings" if summary.warned else "")
+    )
+
+    if verbose or summary.failed or summary.warned:
+        warned_map = {pkg_id: warns for pkg_id, warns in summary.warned}
+        for pkg_id in summary.succeeded:
+            tag = "WARN" if pkg_id in warn_ids else "  OK"
+            warns = warned_map.get(pkg_id, [])
+            warn_str = "; ".join(warns)
+            click.echo(f"  {tag} {pkg_id}" + (f": {warn_str}" if warns else ""))
+        for pkg_id, error_msg in summary.failed:
+            click.echo(f"  FAIL {pkg_id}: {error_msg}", err=True)
 
 
 def _print_import_summary(summary: ImportSummary, verbose: bool, dry_run: bool) -> None:

@@ -246,6 +246,36 @@ def docker_image_v2(
     subprocess.run(["docker", "rmi", "-f", tag], capture_output=True)
 
 
+@pytest.fixture(scope="session")
+def pip_available() -> None:
+    """Skip test if pip is not available in the current Python environment."""
+    from sync_tools.pypi_ops import is_pip_available
+
+    if not is_pip_available():
+        pytest.skip("pip not available")
+
+
+def make_wheel(wheels_dir: pathlib.Path, name: str, version: str) -> pathlib.Path:
+    """Create a minimal .whl file for testing (no real code, just dist-info)."""
+    import zipfile
+
+    safe_name = name.replace("-", "_")
+    filename = f"{safe_name}-{version}-py3-none-any.whl"
+    path = wheels_dir / filename
+    dist_info = f"{safe_name}-{version}.dist-info"
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr(
+            f"{dist_info}/METADATA",
+            f"Metadata-Version: 2.1\nName: {name}\nVersion: {version}\n",
+        )
+        zf.writestr(
+            f"{dist_info}/WHEEL",
+            "Wheel-Version: 1.0\nGenerator: test\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
+        )
+        zf.writestr(f"{dist_info}/RECORD", "")
+    return path
+
+
 @pytest.fixture()
 def state_file(tmp_path: pathlib.Path, git_repo: GitRepo) -> pathlib.Path:
     """Write a minimal state JSON for git_repo with no last_sync (first-time export)."""
