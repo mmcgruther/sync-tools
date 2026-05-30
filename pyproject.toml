@@ -11,13 +11,14 @@ license = { text = "MIT" }
 dependencies = ["click>=8.1"]
 
 [project.scripts]
-sync-tools = "sync_tools.cli:main"
+sync-tools    = "sync_tools.cli:main"
+pipeline-gen  = "pipeline_gen.cli:cli"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-timeout>=2.3"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/sync_tools"]
+packages = ["src/sync_tools", "src/pipeline_gen"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
