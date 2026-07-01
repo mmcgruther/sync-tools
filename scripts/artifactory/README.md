@@ -106,7 +106,7 @@ for pyver in 3.11 3.12 3.13; do
 done
 ```
 
-## Staged directory layout
+## Staged directory layout (local)
 
 ```
 toolchain/
@@ -117,6 +117,42 @@ toolchain/
 
 Pure-Python wheels that pip downloads into every platform directory are automatically
 moved to `any/` and deduplicated so they are only uploaded to Artifactory once.
+
+## Artifactory repository layout
+
+Artifactory's PyPI local repo requires wheels to live in a `/{package_name}/`
+subdirectory so they appear in the PEP 503 simple index.  The push script uploads
+each file to:
+
+```
+PUT /artifactory/{REPO}/{package_name}/{filename}.whl
+```
+
+The package name is the first hyphen-delimited segment of the wheel filename
+(e.g. `pytest` from `pytest-8.3.5-py3-none-any.whl`, `pytest_cov` from
+`pytest_cov-5.0.0-py3-none-any.whl`).
+
+After a successful push you should see this tree in the Artifactory UI:
+
+```
+{REPO}/
+  coverage/
+    coverage-7.x.y-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+    coverage-7.x.y-cp311-cp311-win_amd64.whl
+  pytest/
+    pytest-8.x.y-py3-none-any.whl
+  uv/
+    uv-0.x.y-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+    uv-0.x.y-py3-none-win_amd64.whl
+  …
+```
+
+Artifactory auto-generates the `.pypi/` virtual folder with per-package HTML files
+(the PEP 503 simple index).  That folder is read-only metadata — do not upload to it.
+
+> **If wheels landed at the repo root** (flat layout), delete them and re-run
+> `push-to-artifactory.sh`.  Artifactory stores root-level files but does not include
+> them in the simple index, so `pip install` cannot resolve them.
 
 ## Verifying packages landed in Artifactory
 

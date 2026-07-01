@@ -4,6 +4,12 @@
 # Uploads all wheel files from DOWNLOAD_ROOT to an Artifactory PyPI local repository.
 # Uses HTTP PUT directly against the Artifactory REST API.
 #
+# Upload path layout:
+#   PUT /{repo}/{package_name}/{filename}.whl
+# The package name is extracted from the wheel filename (first hyphen-delimited segment).
+# This is the layout Artifactory's PyPI simple index requires — files at the repo root
+# are stored but not indexed, so pip cannot resolve them.
+#
 # Behaviour:
 #   - HTTP 201/200  → UPLOADED  (counted)
 #   - HTTP 409      → SKIPPED   (file already exists — safe to re-run)
@@ -33,7 +39,7 @@ ARTIFACTORY_URL="${ARTIFACTORY_URL%/}"  # strip any trailing slash
 
 log() { echo "[push-to-artifactory] $*"; }
 
-log "Target : ${ARTIFACTORY_URL}/artifactory/${REPO}"
+log "Target : ${ARTIFACTORY_URL}/artifactory/${REPO}/<package_name>/<filename>.whl"
 log "Source : ${DOWNLOAD_ROOT}"
 log ""
 
@@ -70,7 +76,14 @@ failed=0
 
 for fpath in "${upload_queue[@]}"; do
     fname="$(basename "${fpath}")"
-    url="${ARTIFACTORY_URL}/artifactory/${REPO}/${fname}"
+    # Wheel filename format: {distribution}-{version}-{python}-{abi}-{platform}.whl
+    # The distribution name (first hyphen-delimited segment) is the Artifactory
+    # subdirectory.  Artifactory's PyPI local repo requires this layout:
+    #   /{repo}/{package_name}/{filename}
+    # Files placed at the repo root are stored but NOT indexed by the simple API,
+    # so pip cannot find them.
+    pkg_name="${fname%%-*}"
+    url="${ARTIFACTORY_URL}/artifactory/${REPO}/${pkg_name}/${fname}"
 
     http_code=$(curl -s -o /dev/null -w "%{http_code}" \
         -u "${ART_USER}:${ART_TOKEN}" \
